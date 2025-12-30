@@ -242,41 +242,76 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
         
         # Visualize the full tree with the path highlighted
         st.markdown("### Complete Decision Tree Visualization")
-        st.info("The tree shows all possible decision paths. The green path shows the route taken for this employee's prediction.")
+        st.info("The tree shows all possible decision paths. Nodes in your decision path are highlighted below.")
         
-        # Create custom colors for the decision path
-        n_nodes = model.tree_.node_count
-        node_colors = ['#D3D3D3'] * n_nodes  # Grey for all nodes
+        # Get nodes in the decision path
+        path_nodes = set(node_index)
+        leaf_node = node_index[-1]
         
-        # Highlight the decision path in green
-        for node_id in node_index:
-            if node_id == node_index[-1]:  # Leaf node - brighter green
-                node_colors[node_id] = '#00FF00'
-            else:  # Path nodes - lighter green
-                node_colors[node_id] = '#90EE90'
+        # Create a custom tree visualization using graphviz
+        from sklearn.tree import export_graphviz
+        import graphviz
         
-        fig, ax = plt.subplots(figsize=(20, 10))
-        
-        # Plot tree without auto-coloring
-        artists = plot_tree(
+        # Create DOT data
+        dot_data = export_graphviz(
             model,
             feature_names=feature_names,
             class_names=['Will Stay', 'Will Leave'],
-            filled=False,  # Disable auto-coloring
+            filled=True,
             rounded=True,
-            fontsize=8,
-            ax=ax
+            special_characters=True,
+            out_file=None
         )
         
-        # Apply custom colors to each node
-        for i, artist in enumerate(artists):
-            if i < len(node_colors):
-                artist.get_bbox_patch().set_facecolor(node_colors[i])
-                artist.get_bbox_patch().set_edgecolor('black')
-                artist.get_bbox_patch().set_linewidth(1.5)
+        # Modify DOT to highlight path nodes
+        dot_lines = dot_data.split('\n')
+        modified_lines = []
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        for line in dot_lines:
+            # Check if this line defines a node
+            if '->' not in line and '[label=' in line:
+                # Extract node number
+                node_num = None
+                if line.strip().split()[0].isdigit():
+                    node_num = int(line.strip().split()[0])
+                
+                if node_num is not None:
+                    if node_num == leaf_node:
+                        # Leaf node - bright green with thick border
+                        line = line.replace('fillcolor=', 'fillcolor="#00FF00", penwidth=4.0, color="darkgreen", ')
+                    elif node_num in path_nodes:
+                        # Path nodes - light green with border
+                        line = line.replace('fillcolor=', 'fillcolor="#90EE90", penwidth=3.0, color="green", ')
+                    else:
+                        # Other nodes - grey
+                        line = line.replace('fillcolor=', 'fillcolor="#E8E8E8", ')
+            
+            modified_lines.append(line)
+        
+        modified_dot = '\n'.join(modified_lines)
+        
+        # Render with graphviz
+        try:
+            graph = graphviz.Source(modified_dot)
+            st.graphviz_chart(modified_dot)
+        except:
+            # Fallback to matplotlib if graphviz not available
+            fig, ax = plt.subplots(figsize=(20, 10))
+            plot_tree(
+                model,
+                feature_names=feature_names,
+                class_names=['Will Stay', 'Will Leave'],
+                filled=True,
+                rounded=True,
+                fontsize=8,
+                ax=ax
+            )
+            plt.tight_layout()
+            st.pyplot(fig)
+        
+        # Add legend explaining the path
+        st.success(f"**🟢 Green Path:** Nodes {' → '.join(map(str, node_index))}")
+        st.caption(f"The decision goes through {len(node_index)} nodes, ending at leaf node {leaf_node}.")
         
         # Feature importance for this prediction
         st.markdown("### Key Features Influencing This Prediction")
