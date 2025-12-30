@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
+import matplotlib.pyplot as plt
+from sklearn.tree import plot_tree
 
 # Page configuration
 st.set_page_config(
@@ -152,50 +154,150 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
     prediction = model.predict(input_encoded)[0]
     prediction_proba = model.predict_proba(input_encoded)[0]
     
-    # Display results
+    # Display results with tabs
     st.markdown("---")
     st.header("Prediction Results")
     
-    col_result1, col_result2 = st.columns(2)
+    tab1, tab2, tab3 = st.tabs(["📊 Prediction", "🌳 Decision Path", "💡 Recommendations"])
     
-    with col_result1:
+    with tab1:
+        col_result1, col_result2 = st.columns(2)
+        
+        with col_result1:
+            if prediction == 1:
+                st.error("⚠️ **HIGH RISK**: This employee is likely to leave")
+                st.markdown(f"**Churn Probability: {prediction_proba[1]:.1%}**")
+            else:
+                st.success("✅ **LOW RISK**: This employee is likely to stay")
+                st.markdown(f"**Retention Probability: {prediction_proba[0]:.1%}**")
+        
+        with col_result2:
+            st.subheader("Probability Breakdown")
+            prob_df = pd.DataFrame({
+                'Outcome': ['Will Stay', 'Will Leave'],
+                'Probability': [prediction_proba[0], prediction_proba[1]]
+            })
+            st.bar_chart(prob_df.set_index('Outcome'))
+    
+    with tab2:
+        st.subheader("🌳 Decision Tree Path Explanation")
+        st.markdown("This shows how the model arrived at its decision by following the decision tree.")
+        
+        # Get decision path
+        decision_path = model.decision_path(input_encoded)
+        node_indicator = decision_path.toarray()[0]
+        node_index = np.where(node_indicator == 1)[0]
+        
+        # Get tree structure
+        tree = model.tree_
+        feature = tree.feature
+        threshold = tree.threshold
+        
+        st.markdown("### Path Through the Decision Tree:")
+        
+        # Display the path
+        path_data = []
+        for node_id in node_index:
+            if node_id == node_index[-1]:  # Leaf node
+                if tree.value[node_id][0][1] > tree.value[node_id][0][0]:
+                    decision = "🔴 Predict: WILL LEAVE"
+                    samples_leave = int(tree.value[node_id][0][1])
+                    samples_stay = int(tree.value[node_id][0][0])
+                else:
+                    decision = "🟢 Predict: WILL STAY"
+                    samples_leave = int(tree.value[node_id][0][1])
+                    samples_stay = int(tree.value[node_id][0][0])
+                
+                st.success(f"**Final Decision at Leaf Node {node_id}**")
+                st.write(f"{decision}")
+                st.write(f"- Training samples that stayed: {samples_stay}")
+                st.write(f"- Training samples that left: {samples_leave}")
+                
+            else:
+                feature_name = feature_names[feature[node_id]]
+                threshold_value = threshold[node_id]
+                sample_value = input_encoded.iloc[0][feature_name]
+                
+                if sample_value <= threshold_value:
+                    comparison = "≤"
+                    direction = "⬅️ LEFT (YES)"
+                else:
+                    comparison = ">"
+                    direction = "➡️ RIGHT (NO)"
+                
+                path_data.append({
+                    'Node': node_id,
+                    'Question': f"{feature_name} ≤ {threshold_value:.2f}?",
+                    'Employee Value': f"{sample_value:.2f}",
+                    'Decision': direction
+                })
+        
+        if path_data:
+            st.markdown("### Decision Steps:")
+            for i, step in enumerate(path_data, 1):
+                with st.expander(f"Step {i}: Node {step['Node']}", expanded=True):
+                    st.markdown(f"**Question:** {step['Question']}")
+                    st.markdown(f"**Employee's Value:** {step['Employee Value']}")
+                    st.markdown(f"**Path Taken:** {step['Decision']}")
+        
+        # Visualize the full tree with the path highlighted
+        st.markdown("### Complete Decision Tree Visualization")
+        st.info("The tree shows all possible decision paths. Your employee's specific path is highlighted in the explanation above.")
+        
+        fig, ax = plt.subplots(figsize=(20, 10))
+        plot_tree(
+            model,
+            feature_names=feature_names,
+            class_names=['Will Stay', 'Will Leave'],
+            filled=True,
+            rounded=True,
+            fontsize=8,
+            ax=ax
+        )
+        plt.tight_layout()
+        st.pyplot(fig)
+        
+        # Feature importance for this prediction
+        st.markdown("### Key Features Influencing This Prediction")
+        feature_values = input_encoded.iloc[0]
+        feature_importance = model.feature_importances_
+        
+        # Get top features that were used in the path
+        path_features = []
+        for node_id in node_index[:-1]:  # Exclude leaf node
+            feat_name = feature_names[feature[node_id]]
+            path_features.append({
+                'Feature': feat_name,
+                'Value': feature_values[feat_name],
+                'Importance': feature_importance[feature[node_id]]
+            })
+        
+        if path_features:
+            path_df = pd.DataFrame(path_features).drop_duplicates(subset=['Feature'])
+            path_df = path_df.sort_values('Importance', ascending=False)
+            st.dataframe(path_df, use_container_width=True)
+    
+    with tab3:
+        st.subheader("💡 Recommendations")
+        
         if prediction == 1:
-            st.error("⚠️ **HIGH RISK**: This employee is likely to leave")
-            st.markdown(f"**Churn Probability: {prediction_proba[1]:.1%}**")
+            st.markdown("""
+            **Actions to reduce churn risk:**
+            - Schedule a one-on-one meeting to understand concerns
+            - Review compensation and benefits package
+            - Discuss career development opportunities
+            - Consider flexible work arrangements
+            - Improve work-life balance initiatives
+            - Provide additional training or mentorship
+            """)
         else:
-            st.success("✅ **LOW RISK**: This employee is likely to stay")
-            st.markdown(f"**Retention Probability: {prediction_proba[0]:.1%}**")
-    
-    with col_result2:
-        st.subheader("Probability Breakdown")
-        prob_df = pd.DataFrame({
-            'Outcome': ['Will Stay', 'Will Leave'],
-            'Probability': [prediction_proba[0], prediction_proba[1]]
-        })
-        st.bar_chart(prob_df.set_index('Outcome'))
-    
-    # Recommendations
-    st.markdown("---")
-    st.subheader("💡 Recommendations")
-    
-    if prediction == 1:
-        st.markdown("""
-        **Actions to reduce churn risk:**
-        - Schedule a one-on-one meeting to understand concerns
-        - Review compensation and benefits package
-        - Discuss career development opportunities
-        - Consider flexible work arrangements
-        - Improve work-life balance initiatives
-        - Provide additional training or mentorship
-        """)
-    else:
-        st.markdown("""
-        **Actions to maintain engagement:**
-        - Continue regular check-ins
-        - Recognize and reward good performance
-        - Provide growth opportunities
-        - Maintain open communication channels
-        """)
+            st.markdown("""
+            **Actions to maintain engagement:**
+            - Continue regular check-ins
+            - Recognize and reward good performance
+            - Provide growth opportunities
+            - Maintain open communication channels
+            """)
 
 # Sidebar with info
 with st.sidebar:
