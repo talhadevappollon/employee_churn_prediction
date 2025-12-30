@@ -242,7 +242,7 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
         
         # Visualize the full tree with the path highlighted
         st.markdown("### Complete Decision Tree Visualization")
-        st.info("The tree shows all possible decision paths. Nodes in your decision path are highlighted below.")
+        st.info("The tree shows all possible decision paths. Green highlights show the path taken for this prediction.")
         
         # Get nodes in the decision path
         path_nodes = set(node_index)
@@ -250,52 +250,55 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
         
         # Create a custom tree visualization using graphviz
         from sklearn.tree import export_graphviz
-        import graphviz
+        from io import StringIO
+        from PIL import Image
         
-        # Create DOT data
-        dot_data = export_graphviz(
-            model,
-            feature_names=feature_names,
-            class_names=['Will Stay', 'Will Leave'],
-            filled=True,
-            rounded=True,
-            special_characters=True,
-            out_file=None
-        )
-        
-        # Modify DOT to highlight path nodes
-        dot_lines = dot_data.split('\n')
-        modified_lines = []
-        
-        for line in dot_lines:
-            # Check if this line defines a node
-            if '->' not in line and '[label=' in line:
-                # Extract node number
-                node_num = None
-                if line.strip().split()[0].isdigit():
-                    node_num = int(line.strip().split()[0])
-                
-                if node_num is not None:
-                    if node_num == leaf_node:
-                        # Leaf node - bright green with thick border
-                        line = line.replace('fillcolor=', 'fillcolor="#00FF00", penwidth=4.0, color="darkgreen", ')
-                    elif node_num in path_nodes:
-                        # Path nodes - light green with border
-                        line = line.replace('fillcolor=', 'fillcolor="#90EE90", penwidth=3.0, color="green", ')
-                    else:
-                        # Other nodes - grey
-                        line = line.replace('fillcolor=', 'fillcolor="#E8E8E8", ')
-            
-            modified_lines.append(line)
-        
-        modified_dot = '\n'.join(modified_lines)
-        
-        # Render with graphviz
         try:
+            # Create DOT data
+            dot_data = export_graphviz(
+                model,
+                feature_names=feature_names,
+                class_names=['Will Stay', 'Will Leave'],
+                filled=True,
+                rounded=True,
+                special_characters=True,
+                out_file=None
+            )
+            
+            # Modify DOT to highlight path nodes
+            dot_lines = dot_data.split('\n')
+            modified_lines = []
+            
+            for line in dot_lines:
+                # Check if this line defines a node
+                if '->' not in line and '[label=' in line:
+                    # Extract node number from lines like "0 [label=..."
+                    parts = line.strip().split('[', 1)
+                    if parts[0].strip().isdigit():
+                        node_num = int(parts[0].strip())
+                        
+                        if node_num == leaf_node:
+                            # Leaf node - bright green with thick border
+                            line = line.replace('fillcolor="#', 'fillcolor="#00FF00" , color="darkgreen" , penwidth=4.0 , style=filled , _origfillcolor="#')
+                        elif node_num in path_nodes:
+                            # Path nodes - light green with border
+                            line = line.replace('fillcolor="#', 'fillcolor="#90EE90" , color="green" , penwidth=3.0 , style=filled , _origfillcolor="#')
+                        else:
+                            # Other nodes - light grey
+                            line = line.replace('fillcolor="#', 'fillcolor="#D3D3D3" , style=filled , _origfillcolor="#')
+                
+                modified_lines.append(line)
+            
+            modified_dot = '\n'.join(modified_lines)
+            
+            # Try rendering with graphviz
+            import graphviz
             graph = graphviz.Source(modified_dot)
             st.graphviz_chart(modified_dot)
-        except:
-            # Fallback to matplotlib if graphviz not available
+            
+        except Exception as e:
+            # Fallback to matplotlib
+            st.warning("Using matplotlib visualization (graphviz unavailable)")
             fig, ax = plt.subplots(figsize=(20, 10))
             plot_tree(
                 model,
