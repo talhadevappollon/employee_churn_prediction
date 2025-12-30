@@ -242,18 +242,39 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
         
         # Visualize the full tree with the path highlighted
         st.markdown("### Complete Decision Tree Visualization")
-        st.info("The tree shows all possible decision paths. Your employee's specific path is highlighted in the explanation above.")
+        st.info("The tree shows all possible decision paths. The green path shows the route taken for this employee's prediction.")
+        
+        # Create custom colors for the decision path
+        n_nodes = model.tree_.node_count
+        node_colors = ['#D3D3D3'] * n_nodes  # Grey for all nodes
+        
+        # Highlight the decision path in green
+        for node_id in node_index:
+            if node_id == node_index[-1]:  # Leaf node - brighter green
+                node_colors[node_id] = '#00FF00'
+            else:  # Path nodes - lighter green
+                node_colors[node_id] = '#90EE90'
         
         fig, ax = plt.subplots(figsize=(20, 10))
-        plot_tree(
+        
+        # Plot tree without auto-coloring
+        artists = plot_tree(
             model,
             feature_names=feature_names,
             class_names=['Will Stay', 'Will Leave'],
-            filled=True,
+            filled=False,  # Disable auto-coloring
             rounded=True,
             fontsize=8,
             ax=ax
         )
+        
+        # Apply custom colors to each node
+        for i, artist in enumerate(artists):
+            if i < len(node_colors):
+                artist.get_bbox_patch().set_facecolor(node_colors[i])
+                artist.get_bbox_patch().set_edgecolor('black')
+                artist.get_bbox_patch().set_linewidth(1.5)
+        
         plt.tight_layout()
         st.pyplot(fig)
         
