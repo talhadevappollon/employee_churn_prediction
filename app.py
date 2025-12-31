@@ -254,7 +254,7 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
         from PIL import Image
         
         try:
-            # Create DOT data
+            # Create DOT data - simplified for business users
             dot_data = export_graphviz(
                 model,
                 feature_names=feature_names,
@@ -262,6 +262,9 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
                 filled=True,
                 rounded=True,
                 special_characters=True,
+                impurity=False,  # Remove gini index
+                proportion=True,  # Show proportions instead of sample counts
+                precision=1,  # Reduce decimal places
                 out_file=None
             )
             
@@ -297,7 +300,7 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
             st.graphviz_chart(modified_dot)
             
         except Exception as e:
-            # Fallback to matplotlib
+            # Fallback to matplotlib - simplified for business users
             st.warning("Using matplotlib visualization (graphviz unavailable)")
             fig, ax = plt.subplots(figsize=(20, 10))
             plot_tree(
@@ -307,6 +310,9 @@ if st.button("🔮 Predict Churn Risk", type="primary"):
                 filled=True,
                 rounded=True,
                 fontsize=8,
+                impurity=False,  # Remove gini index
+                proportion=True,  # Show proportions instead of sample counts
+                precision=1,  # Reduce decimal places
                 ax=ax
             )
             plt.tight_layout()
