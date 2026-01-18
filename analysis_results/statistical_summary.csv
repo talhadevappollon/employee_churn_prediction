@@ -1,0 +1,5 @@
+Feature,Test,p-value,Significant,Effect Size,Confidence,Recommendation
+TotalWorkingYears,T-Test,4.0618781112668525e-11,✓,small,99.9% (Extremely High),RECOMMENDED - Valid predictor
+NumCompaniesWorked,T-Test,0.0955252620565195,✗,negligible,Below 95% (Low - Not Reliable),NOT RECOMMENDED - Weak/No association
+OverTime,Chi-Square,8.158423721538322e-21,✓,small,99.9% (Extremely High),RECOMMENDED - Valid predictor
+WorkLifeBalance,Chi-Square,0.0009725698845348822,✓,small,99.9% (Extremely High),RECOMMENDED - Valid predictor
